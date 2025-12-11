@@ -1,0 +1,51 @@
+---
+- name: Create Shared SSL Certificates
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    all_ips: >-
+      {{ 
+        (groups['vault_nodes'] | map('extract', hostvars, 'ansible_host') | list) + 
+        (groups['transit_node'] | map('extract', hostvars, 'ansible_host') | list) 
+      }}
+  tasks:
+    - name: Ensure dirs exist
+      file: 
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ local_cert_dir }}"
+        - "{{ local_keys_dir }}"
+
+    - name: Generate OpenSSL SAN Config
+      copy:
+        dest: "{{ local_cert_dir }}/san.cnf"
+        content: |
+          [req]
+          distinguished_name = req_distinguished_name
+          req_extensions = v3_req
+          x509_extensions = v3_req
+          prompt = no
+          [req_distinguished_name]
+          C = ID
+          O = Vault
+          CN = vault-cluster
+          [v3_req]
+          basicConstraints = CA:TRUE
+          keyUsage = nonRepudiation, digitalSignature, keyEncipherment, keyCertSign
+          extendedKeyUsage = serverAuth, clientAuth
+          subjectAltName = @alt_names
+          [alt_names]
+          IP.1 = 127.0.0.1
+          {% for ip in all_ips %}
+          IP.{{ loop.index + 1 }} = {{ ip }}
+          {% endfor %}
+
+    - name: Generate Certs
+      shell: |
+        openssl req -newkey rsa:2048 -nodes -keyout tls.key \
+        -x509 -days 3650 -out tls.crt \
+        -config san.cnf -extensions v3_req
+      args:
+        chdir: "{{ local_cert_dir }}"

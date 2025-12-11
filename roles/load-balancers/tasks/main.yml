@@ -1,0 +1,118 @@
+---
+# --- 1. PRE-FLIGHT CHECK (Strict) ---
+- name: Validate Local Certificates Exist (Controller)
+  stat:
+    path: "{{ playbook_dir }}/{{ local_cert_path }}/{{ item }}"
+  delegate_to: localhost
+  loop:
+    - tls.crt
+    - tls.key
+  register: local_certs
+  failed_when: not local_certs.stat.exists
+
+# --- 2. CHECK SERVICE STATUS (Optimization) ---
+- name: Check if HAProxy is already running
+  command: systemctl is-active haproxy
+  register: haproxy_check
+  failed_when: false
+  changed_when: false
+  ignore_errors: true
+
+- name: Check if Keepalived is already running
+  command: systemctl is-active keepalived
+  register: keepalived_check
+  failed_when: false
+  changed_when: false
+  ignore_errors: true
+
+# --- 3. INSTALL DEPENDENCIES (Conditional) ---
+# Hanya jalan jika salah satu service MATI atau BELUM ADA
+- name: Update APT & Install Packages
+  apt:
+    name: ['haproxy', 'keepalived', 'psmisc']
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  when: 
+    - (haproxy_check.rc != 0) or (keepalived_check.rc != 0)
+
+- name: Enable Non-Local Bind (Sysctl)
+  sysctl:
+    name: net.ipv4.ip_nonlocal_bind
+    value: '1'
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+# --- 4. CERTIFICATE DISTRIBUTION (Idempotent) ---
+- name: Create Cert Directory
+  file:
+    path: /etc/haproxy/certs
+    state: directory
+    mode: '0750'
+    owner: haproxy
+    group: haproxy
+
+- name: Distribute Cert & Key
+  copy:
+    src: "{{ playbook_dir }}/{{ local_cert_path }}/{{ item }}"
+    dest: "/etc/haproxy/certs/{{ item }}"
+    mode: '0640'
+    owner: haproxy
+    group: haproxy
+  loop:
+    - tls.crt
+    - tls.key
+  register: cert_copy
+
+- name: Rebuild HAProxy PEM Bundle
+  shell: |
+    (cat /etc/haproxy/certs/tls.crt; echo ""; cat /etc/haproxy/certs/tls.key) > /etc/haproxy/certs/tls.pem
+    chmod 600 /etc/haproxy/certs/tls.pem
+    chown haproxy:haproxy /etc/haproxy/certs/tls.pem
+  when: cert_copy.changed
+
+# --- 5. HAPROXY DEPLOY (Strict Validate) ---
+- name: Deploy HAProxy Configuration
+  template:
+    # Ansible akan otomatis mencari di roles/load-balancers/templates/
+    src: haproxy.cfg.j2  
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+    validate: haproxy -c -f %s 
+  register: haproxy_conf
+
+- name: Restart HAProxy
+  service:
+    name: haproxy
+    state: restarted
+    enabled: yes
+  when: haproxy_conf.changed or cert_copy.changed
+
+- name: Verify HAProxy is Running
+  command: systemctl status haproxy
+  register: haproxy_status
+  changed_when: false
+  failed_when: "'active (running)' not in haproxy_status.stdout"
+
+# --- 6. KEEPALIVED DEPLOY ---
+- name: Deploy Keepalived Configuration
+  template:
+    # Ansible akan otomatis mencari di roles/load-balancers/templates/
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0644'
+  register: keepalived_conf
+
+- name: Restart Keepalived
+  service:
+    name: keepalived
+    state: restarted
+    enabled: yes
+  when: keepalived_conf.changed
+
+- name: Verify Keepalived is Running
+  command: systemctl status keepalived
+  register: keepalived_status
+  changed_when: false
+  failed_when: "'active (running)' not in keepalived_status.stdout"

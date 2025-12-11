@@ -1,0 +1,39 @@
+ui = true
+disable_mlock = true
+
+listener "tcp" {
+  address            = "0.0.0.0:8200"
+  cluster_address    = "{{ ansible_host }}:8201"
+  
+  tls_cert_file      = "/vault/tls/tls.crt"
+  tls_key_file       = "/vault/tls/tls.key"
+  tls_client_ca_file = "/vault/tls/tls.crt"
+}
+
+storage "raft" {
+  path    = "/vault/data"
+  node_id = "{{ node_id }}"
+
+{% for host in groups['vault_nodes'] %}
+{% if host != inventory_hostname %}
+  retry_join {
+    leader_api_addr         = "https://{{ hostvars[host]['ansible_host'] }}:8200"
+    leader_ca_cert_file     = "/vault/tls/tls.crt"
+    leader_client_cert_file = "/vault/tls/tls.crt"
+    leader_client_key_file  = "/vault/tls/tls.key"
+  }
+{% endif %}
+{% endfor %}
+}
+
+seal "transit" {
+  address         = "https://{{ hostvars[groups['transit_node'][0]]['ansible_host'] }}:8200"
+  token           = "{{ transit_token_value }}"
+  disable_renewal = "false"
+  key_name        = "autounseal"
+  mount_path      = "transit/"
+  tls_skip_verify = "true" 
+}
+
+api_addr     = "https://{{ ansible_host }}:8200"
+cluster_addr = "https://{{ ansible_host }}:8201"

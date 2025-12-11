@@ -1,0 +1,24 @@
+---
+- name: Deploy HAProxy & Keepalived Load Balancer
+  hosts: loadbalancers
+  become: true
+  gather_facts: true
+  vars:
+    local_cert_path: "../lb_cert"
+  roles:
+    - ../roles/load-balancers
+  post_tasks:
+    - name: Final Validation - Check VIP on Master (Retry Loop)
+      shell: "ip addr show {{ vip_interface }} | grep {{ vip_address }}"
+      register: vip_check
+      until: vip_check.rc == 0
+      retries: 20
+      delay: 3
+      changed_when: false
+      when: 
+        - inventory_hostname == groups['loadbalancers'][0] 
+        - keepalived_state == 'MASTER'
+      ignore_errors: true 
+    - name: SUCCESS MESSAGE
+      debug:
+        msg: "Load Balancer Ready. VIP: https://{{ vip_address }}"

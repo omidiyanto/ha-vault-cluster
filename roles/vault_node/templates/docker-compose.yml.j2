@@ -1,0 +1,17 @@
+services:
+  vault:
+    hostname: {{ node_id }}
+    container_name: vault
+    image: hashicorp/vault:{{ vault_version }}
+    restart: always
+    network_mode: "host"
+    entrypoint: vault server -config=/vault/config/vault.hcl
+    environment:
+      VAULT_ADDR: "https://127.0.0.1:8200"
+      VAULT_SKIP_VERIFY: "true"
+    volumes:
+      - ./tls:/vault/tls
+      - ./config:/vault/config
+      - ./data:/vault/data
+    cap_add:
+      - IPC_LOCK

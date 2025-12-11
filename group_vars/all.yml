@@ -1,0 +1,4 @@
+vault_version: "latest"
+vault_base_dir: "/opt/vault"
+local_cert_dir: "{{ playbook_dir }}/../local_certs"
+local_keys_dir: "{{ playbook_dir }}/../keys"

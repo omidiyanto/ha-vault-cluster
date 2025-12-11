@@ -1,0 +1,19 @@
+---
+- name: Distribute Certificates to Nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: Create TLS directory
+      file:
+        path: "{{ vault_base_dir }}/tls"
+        state: directory
+        mode: '0755'
+
+    - name: Copy Cert and Key
+      copy:
+        src: "{{ local_cert_dir }}/{{ item }}"
+        dest: "{{ vault_base_dir }}/tls/{{ item }}"
+        mode: '0644'
+      loop:
+        - tls.crt
+        - tls.key

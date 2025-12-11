@@ -1,0 +1,7 @@
+path "transit/encrypt/{{ key_name | default('autounseal') }}" {
+  capabilities = [ "update" ]
+}
+
+path "transit/decrypt/{{ key_name | default('autounseal') }}" {
+  capabilities = [ "update" ]
+}

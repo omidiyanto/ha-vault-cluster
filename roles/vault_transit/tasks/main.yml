@@ -1,0 +1,136 @@
+---
+- name: Create Directories
+  file:
+    path: "{{ vault_base_dir }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: [config, data]
+
+- name: Template Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ vault_base_dir }}/docker-compose.yml"
+  register: compose_config
+
+- name: Template Vault Config (Into Config Folder)
+  template:
+    src: vault.hcl.j2
+    dest: "{{ vault_base_dir }}/config/vault.hcl"
+  register: vault_config
+
+- name: Ensure Transit Container Running
+  shell: docker compose up -d
+  args:
+    chdir: "{{ vault_base_dir }}"
+  register: compose_up
+  when: compose_config.changed or vault_config.changed or compose_up is not defined
+
+- name: Wait for Vault API
+  wait_for:
+    port: 8200
+    delay: 5
+    timeout: 30
+
+- name: Check Init Status
+  command: docker exec vault-transit vault status -format=json
+  register: tr_status
+  failed_when: tr_status.rc not in [0, 2] 
+  changed_when: false
+
+- name: Initialize Transit (5 Shares, 3 Threshold)
+  command: docker exec vault-transit vault operator init -key-shares=5 -key-threshold=3 -format=json
+  register: tr_init
+  when: 
+    - tr_status.stdout | length > 0
+    - (tr_status.stdout | from_json).initialized == false
+
+- name: SAVE Transit Keys Locally
+  copy:
+    content: "{{ tr_init.stdout }}"
+    dest: "{{ local_keys_dir }}/transit_keys.json"
+  delegate_to: localhost
+  when: tr_init.changed
+
+- name: Read Transit Keys from Local File (If exists)
+  slurp:
+    src: "{{ local_keys_dir }}/transit_keys.json"
+  register: local_transit_keys
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Set Fact for Unseal Keys
+  set_fact:
+    current_unseal_keys: >-
+      {{ 
+        (tr_init.stdout | from_json).unseal_keys_b64 
+        if tr_init.changed 
+        else (local_transit_keys['content'] | b64decode | from_json).unseal_keys_b64 
+      }}
+    current_root_token: >-
+      {{ 
+        (tr_init.stdout | from_json).root_token 
+        if tr_init.changed 
+        else (local_transit_keys['content'] | b64decode | from_json).root_token 
+      }}
+  when: tr_init.changed or local_transit_keys.failed is false
+
+- name: Unseal Transit (Loop 3 Keys)
+  command: "docker exec vault-transit vault operator unseal {{ item }}"
+  loop: "{{ current_unseal_keys[:3] }}"
+  when: 
+    - (tr_status.stdout | from_json).sealed == true
+    - current_unseal_keys is defined
+  no_log: true 
+
+- name: Check Enabled Secrets Engines
+  command: docker exec -e VAULT_TOKEN={{ current_root_token }} vault-transit vault secrets list -format=json
+  register: mounts_list
+  changed_when: false
+
+- name: Enable Transit Engine
+  command: docker exec -e VAULT_TOKEN={{ current_root_token }} vault-transit vault secrets enable transit
+  when: "'transit/' not in (mounts_list.stdout | from_json)"
+
+- name: Check if 'autounseal' Key Exists
+  command: docker exec -e VAULT_TOKEN={{ current_root_token }} vault-transit vault read -format=json transit/keys/autounseal
+  register: key_check
+  failed_when: false
+  changed_when: false
+
+- name: Create Key 'autounseal'
+  command: docker exec -e VAULT_TOKEN={{ current_root_token }} vault-transit vault write -f transit/keys/autounseal
+  when: key_check.rc != 0
+
+- name: Template Policy File inside Container
+  template:
+    src: autounseal_policy.hcl.j2
+    dest: "{{ vault_base_dir }}/config/autounseal_policy.hcl" # <-- Ini juga sudah benar masuk config
+  vars:
+    key_name: "autounseal" 
+
+- name: Write/Update Policy to Vault
+  command: >
+    docker exec -e VAULT_TOKEN={{ current_root_token }} vault-transit 
+    vault policy write autounseal /vault/config/autounseal_policy.hcl
+  register: policy_write
+  changed_when: "'Success! Uploaded policy: autounseal' in policy_write.stdout"
+
+- name: Check if Token File Exists Locally
+  stat:
+    path: "{{ local_keys_dir }}/transit_token.txt"
+  register: token_file
+  delegate_to: localhost
+
+- name: Create Token for Main Cluster (Only if missing)
+  command: >
+    docker exec -e VAULT_TOKEN={{ current_root_token }} vault-transit 
+    vault token create -policy=autounseal -orphan -format=json
+  register: new_token
+  when: not token_file.stat.exists
+
+- name: SAVE Transit Token Locally
+  copy:
+    content: "{{ (new_token.stdout | from_json).auth.client_token }}"
+    dest: "{{ local_keys_dir }}/transit_token.txt"
+  delegate_to: localhost
+  when: new_token.changed
