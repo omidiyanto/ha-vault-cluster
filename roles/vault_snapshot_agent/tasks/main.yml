@@ -9,21 +9,21 @@
 
 - name: Create Config Directory
   file:
-    path: "{{ vault_base_dir }}-snapshot-agent"/config
+    path: "{{ vault_base_dir }}-snapshot-agent/config"
     state: directory
     mode: '0700'
 
 - name: Template Agent Config (JSON)
   template:
     src: config.json.j2
-    dest: "{{ vault_base_dir }}-snapshot-agent"/config/config.json
+    dest: "{{ vault_base_dir }}-snapshot-agent/config/config.json"
     mode: '0600'
   register: agent_config
 
 - name: Template Docker Compose
   template:
     src: docker-compose.yml.j2
-    dest: "{{ vault_base_dir }}-snapshot-agent"/docker-compose.yml
+    dest: "{{ vault_base_dir }}-snapshot-agent/docker-compose.yml"
   register: agent_compose
 
 
