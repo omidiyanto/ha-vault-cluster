@@ -1,0 +1,8 @@
+services:
+  vault-snapshot-agent:
+    container_name: vault-snapshot-agent
+    image: ghcr.io/argelbargel/vault-raft-snapshot-agent:latest
+    restart: always
+    network_mode: "host" 
+    volumes:
+      - ./config/config.json:/etc/vault.d/snapshots.json

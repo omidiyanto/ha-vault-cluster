@@ -2,3 +2,17 @@ vault_version: "latest"
 vault_base_dir: "/opt/vault"
 local_cert_dir: "{{ playbook_dir }}/../local_certs"
 local_keys_dir: "{{ playbook_dir }}/../keys"
+
+backup_s3_endpoint: "s3.omidiyanto.local"
+backup_s3_bucket: "vault-cluster-snapshots"
+backup_s3_access_key: "admin"
+backup_s3_secret_key: "Passw0rd"
+backup_s3_region: "us-east-1"
+
+vault_addr_main: "https://vault.omidiyanto.local" 
+vault_addr_transit: "https://192.168.13.214:8200"
+
+snapshot_approle_name: "snapshot-agent"
+snapshot_token_ttl: "1m"    
+snapshot_token_max_ttl: "2m" 
+snapshot_secret_id_ttl: "0"

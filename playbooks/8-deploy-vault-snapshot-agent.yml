@@ -1,0 +1,68 @@
+---
+# ==============================================================================
+# PLAY 1: SETUP CREDENTIALS (LOCALHOST)
+# Menggunakan task khusus 'approle_setup.yml' dari role yang sama
+# ==============================================================================
+- name: Prepare AppRole Credentials (Centralized)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # --- Konfigurasi Global ---
+    approle_file_path: "../keys/snapshot_approle.json"
+    
+    # Variabel global dari group_vars/all.yml akan otomatis terbaca
+    token_ttl: "{{ snapshot_token_ttl }}"
+    token_max_ttl: "{{ snapshot_token_max_ttl }}"
+    secret_id_ttl: "{{ snapshot_secret_id_ttl }}"
+
+  tasks:
+    # --- SETUP MAIN CLUSTER ---
+    - name: "Setup AppRole for MAIN Cluster"
+      include_role:
+        name: ../roles/vault_snapshot_agent
+        tasks_from: approle_setup  # <--- MAGIC KEYWORD
+      vars:
+        cluster_key: "main"
+        vault_addr: "{{ vault_addr_main }}"
+        root_token_file: "../keys/main_cluster_keys.json"
+
+    # --- SETUP TRANSIT CLUSTER ---
+    - name: "Setup AppRole for TRANSIT Cluster"
+      include_role:
+        name: ../roles/vault_snapshot_agent
+        tasks_from: approle_setup
+      vars:
+        cluster_key: "transit"
+        vault_addr: "{{ vault_addr_transit }}"
+        root_token_file: "../keys/transit_keys.json"
+
+
+# ==============================================================================
+# PLAY 2: DEPLOY TO MAIN CLUSTER (REMOTE)
+# Menggunakan task default 'main.yml'
+# ==============================================================================
+- name: Deploy Snapshot Agent to Main Cluster
+  hosts: vault_nodes
+  become: true
+  vars:
+    # Load JSON file once
+    approle_creds: "{{ lookup('file', '../keys/snapshot_approle.json') | from_json }}"
+    snapshot_role_id: "{{ approle_creds.main.role_id }}"
+    snapshot_secret_id: "{{ approle_creds.main.secret_id }}"
+  roles:
+    - ../roles/vault_snapshot_agent 
+
+# ==============================================================================
+# PLAY 3: DEPLOY TO TRANSIT NODE (REMOTE)
+# Menggunakan task default 'main.yml'
+# ==============================================================================
+- name: Deploy Snapshot Agent to Transit Node
+  hosts: transit_node
+  become: true
+  vars:
+    approle_creds: "{{ lookup('file', '../keys/snapshot_approle.json') | from_json }}"
+    snapshot_role_id: "{{ approle_creds.transit.role_id }}"
+    snapshot_secret_id: "{{ approle_creds.transit.secret_id }}"
+  roles:
+    - ../roles/vault_snapshot_agent

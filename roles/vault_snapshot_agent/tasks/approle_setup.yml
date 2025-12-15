@@ -1,0 +1,102 @@
+---
+- name: "Load Root Token for {{ cluster_key }}"
+  set_fact:
+    vault_root_token: "{{ lookup('file', root_token_file) | from_json | json_query('root_token') }}"
+
+- name: "Load existing AppRole JSON file (Safe Load)"
+  set_fact:
+    approle_data: "{{ lookup('file', approle_file_path, errors='ignore') | default('{}', true) | from_json }}"
+
+- name: "Ensure JSON structure for {{ cluster_key }} is initialized"
+  set_fact:
+    approle_data: |
+      {{
+        approle_data | combine({
+          (cluster_key): {
+            'role_id': approle_data.get(cluster_key, {}).get('role_id', None),
+            'secret_id': approle_data.get(cluster_key, {}).get('secret_id', None)
+          }
+        }, recursive=True)
+      }}
+
+- name: "Create/Update Snapshot Policy on {{ cluster_key }}"
+  uri:
+    url: "{{ vault_addr }}/v1/sys/policy/snapshot-agent"
+    method: PUT
+    headers: { X-Vault-Token: "{{ vault_root_token }}" }
+    body_format: json
+    body:
+      policy: |
+        path "/sys/storage/raft/snapshot" {
+          capabilities = ["read", "create"] 
+        }
+    validate_certs: false
+    status_code: [200, 204]
+    follow_redirects: all
+
+- name: "Enable AppRole Auth Method on {{ cluster_key }}"
+  uri:
+    url: "{{ vault_addr }}/v1/sys/auth/approle"
+    method: POST
+    headers: { X-Vault-Token: "{{ vault_root_token }}" }
+    body_format: json
+    body: { type: "approle" }
+    validate_certs: false
+    status_code: [200, 204, 400]
+    follow_redirects: all
+
+- name: "Create/Update AppRole '{{ snapshot_approle_name }}' on {{ cluster_key }}"
+  uri:
+    url: "{{ vault_addr }}/v1/auth/approle/role/{{ snapshot_approle_name }}"
+    method: POST
+    headers: { X-Vault-Token: "{{ vault_root_token }}" }
+    body_format: json
+    body:
+      token_policies: ["snapshot-agent"]
+      token_ttl: "{{ token_ttl }}"
+      token_max_ttl: "{{ token_max_ttl }}"
+      secret_id_ttl: "{{ secret_id_ttl }}"
+      token_renewable: true
+    validate_certs: false
+    status_code: [200, 204]
+    follow_redirects: all  
+
+- name: "Fetch RoleID from {{ cluster_key }}"
+  uri:
+    url: "{{ vault_addr }}/v1/auth/approle/role/{{ snapshot_approle_name }}/role-id"
+    method: GET
+    headers: { X-Vault-Token: "{{ vault_root_token }}" }
+    validate_certs: false
+    follow_redirects: all 
+  register: role_id_resp
+
+- name: "Generate SecretID for {{ cluster_key }} (If missing)"
+  uri:
+    url: "{{ vault_addr }}/v1/auth/approle/role/{{ snapshot_approle_name }}/secret-id"
+    method: POST
+    headers: { X-Vault-Token: "{{ vault_root_token }}" }
+    body_format: json
+    body:
+      metadata: "{\"source\": \"ansible\"}"
+    validate_certs: false
+    follow_redirects: all 
+  register: secret_id_resp
+  when: not approle_data[cluster_key]['secret_id']
+
+- name: "Update AppRole Data Variable for {{ cluster_key }}"
+  set_fact:
+    approle_data: |
+      {{
+        approle_data | combine({
+          (cluster_key): {
+            'role_id': role_id_resp.json.data.role_id,
+            'secret_id': (secret_id_resp.json.data.secret_id if (secret_id_resp is not skipped and secret_id_resp.json is defined) else approle_data[cluster_key]['secret_id'])
+          }
+        }, recursive=True)
+      }}
+
+- name: "Save updated credentials to {{ approle_file_path }}"
+  copy:
+    content: "{{ approle_data | to_nice_json(indent=4) }}"
+    dest: "{{ approle_file_path }}"
+    mode: '0600'

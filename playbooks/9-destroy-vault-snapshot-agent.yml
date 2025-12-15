@@ -1,0 +1,13 @@
+- name: Destory Vault Snapshot Agents
+  hosts: 
+    - vault_nodes
+    - transit_node
+  become: true
+  tasks:
+    - name: Stop and Remove Snapshot Agent Container
+      shell: docker compose down
+      args:
+        chdir: "{{ vault_base_dir }}-snapshot-agent"
+      ignore_errors: true
+    - name: Remove Snapshot Agent Directory
+      shell: rm -rf "{{ vault_base_dir }}-snapshot-agent"
