@@ -1,6 +1,6 @@
 ---
 - name: Distribute Certificates to Nodes
-  hosts: all
+  hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true
   tasks:
     - name: Create TLS directory
