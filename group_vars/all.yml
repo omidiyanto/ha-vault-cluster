@@ -3,11 +3,16 @@ vault_base_dir: "/opt/vault"
 local_cert_dir: "{{ playbook_dir }}/../local_certs"
 local_keys_dir: "{{ playbook_dir }}/../keys"
 
-backup_s3_endpoint: "s3.omidiyanto.local"
+enable_s3: true
+backup_s3_endpoint: "https://s3.omidiyanto.local"
 backup_s3_bucket: "vault-cluster-snapshots"
 backup_s3_access_key: "admin"
-backup_s3_secret_key: "Passw0rd"
+backup_s3_secret_key: "PASS"
 backup_s3_region: "us-east-1"
+snapshot_retain: 3
+snapshot_frequency: "10m"
+snapshot_timezone: "Asia/Jakarta"
+snapshot_agent_image: ghcr.io/omidiyanto/simple-lightweight-vault-raft-snapshot-agent:latest
 
 vault_addr_main: "https://vault.omidiyanto.local" 
 vault_addr_transit: "https://192.168.13.214:8200"

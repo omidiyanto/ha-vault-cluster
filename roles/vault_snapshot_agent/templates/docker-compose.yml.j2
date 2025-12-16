@@ -1,8 +1,20 @@
 services:
   vault-snapshot-agent:
     container_name: vault-snapshot-agent
-    image: ghcr.io/argelbargel/vault-raft-snapshot-agent:latest
-    restart: always
-    network_mode: "host" 
-    volumes:
-      - ./config/config.json:/etc/vault.d/snapshots.json
+    image: {{ snapshot_agent_image }}
+    network_mode: "host"
+    restart: unless-stopped
+    environment:
+      VAULT_ADDR: https://127.0.0.1:8200
+      VAULT_ROLE_ID: {{ snapshot_role_id }}
+      VAULT_SECRET_ID: {{ snapshot_secret_id }}
+      ENABLE_S3: {{ enable_s3 }}
+      AWS_ENDPOINT_URL: {{ backup_s3_endpoint }}
+      STORAGE_S3_BUCKET: {{ backup_s3_bucket }}
+      STORAGE_S3_REGION: {{ backup_s3_region }}
+      AWS_ACCESS_KEY_ID: {{ backup_s3_access_key }}
+      AWS_SECRET_ACCESS_KEY: "{{ backup_s3_secret_key }}"
+      SNAPSHOT_PREFIX: {{ snapshot_folder_name }}/snapshot-
+      SNAPSHOT_FREQUENCY: "{{ snapshot_frequency }}"
+      SNAPSHOT_RETAIN: {{ snapshot_retain }}
+      SNAPSHOT_TIMEZONE: {{ snapshot_timezone }}

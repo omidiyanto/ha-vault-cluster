@@ -13,22 +13,18 @@
     - config
     - data
 
-# Kita register status perubahan config ke variabel
 - name: Template Vault Config (HCL)
   template:
     src: vault.hcl.j2
     dest: "{{ vault_base_dir }}/config/vault.hcl"
   register: vault_config_status
 
-# Kita register status perubahan docker-compose ke variabel
 - name: Template Docker Compose
   template:
     src: docker-compose.yml.j2
     dest: "{{ vault_base_dir }}/docker-compose.yml"
   register: compose_config_status
 
-# Deploy/Start logic:
-# Jalan HANYA JIKA: Container mati (stdout kosong) OR Config berubah OR Compose berubah
 - name: Ensure Container Up (Deploy/Recreate)
   shell: docker compose up -d
   args:

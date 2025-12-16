@@ -4,8 +4,7 @@
   register: docker_check
   ignore_errors: true
   changed_when: false
-
-# Block ini hanya jalan jika docker BELUM terinstall (failed)
+  
 - name: Install Docker Components
   block:
     - name: Install dependencies

@@ -1,5 +1,4 @@
 ---
-# --- 1. PRE-FLIGHT CHECK (Strict) ---
 - name: Validate Local Certificates Exist (Controller)
   stat:
     path: "{{ playbook_dir }}/{{ local_cert_path }}/{{ item }}"
@@ -10,7 +9,6 @@
   register: local_certs
   failed_when: not local_certs.stat.exists
 
-# --- 2. CHECK SERVICE STATUS (Optimization) ---
 - name: Check if HAProxy is already running
   command: systemctl is-active haproxy
   register: haproxy_check
@@ -25,8 +23,6 @@
   changed_when: false
   ignore_errors: true
 
-# --- 3. INSTALL DEPENDENCIES (Conditional) ---
-# Hanya jalan jika salah satu service MATI atau BELUM ADA
 - name: Update APT & Install Packages
   apt:
     name: ['haproxy', 'keepalived', 'psmisc']
@@ -44,7 +40,6 @@
     sysctl_set: yes
     reload: yes
 
-# --- 4. CERTIFICATE DISTRIBUTION (Idempotent) ---
 - name: Create Cert Directory
   file:
     path: /etc/haproxy/certs
@@ -72,10 +67,8 @@
     chown haproxy:haproxy /etc/haproxy/certs/tls.pem
   when: cert_copy.changed
 
-# --- 5. HAPROXY DEPLOY (Strict Validate) ---
 - name: Deploy HAProxy Configuration
   template:
-    # Ansible akan otomatis mencari di roles/load-balancers/templates/
     src: haproxy.cfg.j2  
     dest: /etc/haproxy/haproxy.cfg
     mode: '0644'
@@ -95,10 +88,8 @@
   changed_when: false
   failed_when: "'active (running)' not in haproxy_status.stdout"
 
-# --- 6. KEEPALIVED DEPLOY ---
 - name: Deploy Keepalived Configuration
   template:
-    # Ansible akan otomatis mencari di roles/load-balancers/templates/
     src: keepalived.conf.j2
     dest: /etc/keepalived/keepalived.conf
     mode: '0644'
