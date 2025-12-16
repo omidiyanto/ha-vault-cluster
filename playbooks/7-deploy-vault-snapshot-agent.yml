@@ -28,7 +28,6 @@
         vault_addr: "{{ vault_addr_transit }}"
         root_token_file: "../keys/transit_keys.json"
 
-
 - name: Deploy Snapshot Agent to Main Cluster
   hosts: vault_nodes
   become: true
@@ -37,7 +36,8 @@
     snapshot_role_id: "{{ approle_creds.main.role_id }}"
     snapshot_secret_id: "{{ approle_creds.main.secret_id }}"
   roles:
-    - ../roles/vault_snapshot_agent 
+    - role: ../roles/vault_snapshot_agent
+      when: target is not defined or target == 'vault_nodes'
 
 - name: Deploy Snapshot Agent to Transit Node
   hosts: transit_node
@@ -47,4 +47,5 @@
     snapshot_role_id: "{{ approle_creds.transit.role_id }}"
     snapshot_secret_id: "{{ approle_creds.transit.secret_id }}"
   roles:
-    - ../roles/vault_snapshot_agent
+    - role: ../roles/vault_snapshot_agent
+      when: target is not defined or target == 'transit_node'
