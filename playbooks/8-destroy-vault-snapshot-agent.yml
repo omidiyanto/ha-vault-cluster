@@ -1,7 +1,5 @@
-- name: Destory Vault Snapshot Agents
-  hosts: 
-    - vault_nodes
-    - transit_node
+- name: Destroy Vault Snapshot Agents
+  hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true
   tasks:
     - name: Stop and Remove Snapshot Agent Container

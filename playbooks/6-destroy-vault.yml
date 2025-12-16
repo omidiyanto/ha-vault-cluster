@@ -1,9 +1,11 @@
 ---
 - name: Rolling Restart Vault Nodes
-  hosts: "{{ target | default('vault_nodes') }}" 
+  hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true  
   tasks:
     - name: Destroy All Vault
       shell: docker compose down
       args:
         chdir: "{{ vault_base_dir }}"
+    - name: Remove Vault Directory
+      shell: rm -rf "{{ vault_base_dir }}"

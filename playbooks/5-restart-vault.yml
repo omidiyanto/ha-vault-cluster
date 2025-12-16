@@ -1,9 +1,8 @@
 ---
 - name: Rolling Restart Vault Nodes
-  hosts: "{{ target | default('vault_nodes') }}" 
+  hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true
-  serial: 1  
-  
+  serial: 1
   tasks:
     - name: Restart Vault Container
       shell: docker compose down && docker compose up -d
@@ -14,6 +13,37 @@
       wait_for:
         port: 8200
         host: "127.0.0.1"
-        delay: 5     
-        timeout: 60   
+        delay: 5
+        timeout: 60
         state: started
+
+    - name: Unseal Operations for Transit Node
+      block:
+        - name: Read Transit Keys from Local File
+          slurp:
+            src: "{{ local_keys_dir }}/transit_keys.json"
+          register: local_transit_keys
+          delegate_to: localhost
+          become: false 
+
+        - name: Set Fact for Unseal Keys
+          set_fact:
+            current_unseal_keys: >-
+              {{ (local_transit_keys['content'] | b64decode | from_json).unseal_keys_b64 }}
+          when: local_transit_keys.content is defined
+
+        - name: Check Vault Sealed Status
+          command: docker exec vault-transit vault status -format=json
+          register: tr_status
+          changed_when: false
+          failed_when: tr_status.rc not in [0, 2] 
+          ignore_errors: true
+
+        - name: Unseal Transit (Loop 3 Keys)
+          command: "docker exec vault-transit vault operator unseal {{ item }}"
+          loop: "{{ current_unseal_keys[:3] }}"
+          when: 
+            - tr_status.rc == 2 or (tr_status.stdout | from_json).sealed == true
+            - current_unseal_keys is defined
+          no_log: true
+      when: inventory_hostname in groups['transit_node']
