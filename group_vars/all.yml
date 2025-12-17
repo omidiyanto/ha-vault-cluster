@@ -1,7 +1,7 @@
 vault_version: "latest"
 vault_base_dir: "/opt/vault"
-local_cert_dir: "{{ playbook_dir }}/../local_certs"
-local_keys_dir: "{{ playbook_dir }}/../keys"
+local_cert_dir: "{{ playbook_dir }}/../../local_certs"
+local_keys_dir: "{{ playbook_dir }}/../../keys"
 
 enable_s3: true
 backup_s3_endpoint: "https://s3.omidiyanto.local"
