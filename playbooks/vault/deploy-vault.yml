@@ -3,12 +3,11 @@
   hosts: vault_nodes
   become: true
   vars:
-    transit_token_value: "{{ lookup('file', '../keys/transit_token.txt') }}"
+    transit_token_value: "{{ lookup('file', '../../keys/transit_token.txt') }}"
   roles:
-    - ../roles/docker_setup
-    - ../roles/vault_node
+    - ../../roles/docker_setup
+    - ../../roles/vault_node
 
-# --- POST DEPLOY: IDEMPOTENT INITIALIZE ---
 - name: Initialize Main Cluster & Save Keys
   hosts: vault1
   become: true

@@ -1,0 +1,39 @@
+---
+- name: Destroy HAProxy & Keepalived
+  hosts: loadbalancers
+  become: true
+  tasks:
+    - name: Stop Services (Release VIP immediately)
+      service:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - keepalived
+        - haproxy
+      ignore_errors: true
+
+    - name: Purge Packages (Remove Configs & Binaries)
+      apt:
+        name: ['haproxy', 'keepalived', 'psmisc']
+        state: absent
+        purge: yes
+        autoremove: yes
+
+    - name: Remove Configuration & Certificate Directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/haproxy
+        - /etc/keepalived
+
+    - name: Revert Non-Local Bind Sysctl
+      sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        state: absent
+        reload: yes
+      ignore_errors: true
+
+    - name: Success Message
+      debug:
+        msg: "Load Balancer has been destroyed and VIP released."

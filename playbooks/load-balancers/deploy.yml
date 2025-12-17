@@ -4,9 +4,9 @@
   become: true
   gather_facts: true
   vars:
-    local_cert_path: "../lb_cert"
+    local_cert_path: "../../lb_cert"
   roles:
-    - ../roles/load-balancers
+    - ../../roles/load-balancers
   post_tasks:
     - name: Final Validation - Check VIP on Master (Retry Loop)
       shell: "ip addr show {{ vip_interface }} | grep {{ vip_address }}"

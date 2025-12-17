@@ -1,0 +1,9 @@
+---
+- name: Restart Vault Snapshot Agent Container
+  hosts: "{{ target | default('vault_nodes:transit_node') }}"
+  become: true
+  tasks:
+    - name: Restart Container
+      shell: docker compose down && docker compose up -d
+      args:
+        chdir: "{{ vault_base_dir }}-snapshot-agent"

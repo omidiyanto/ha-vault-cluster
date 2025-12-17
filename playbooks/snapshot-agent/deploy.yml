@@ -4,7 +4,7 @@
   connection: local
   gather_facts: false
   vars:
-    approle_file_path: "../keys/snapshot_approle.json"
+    approle_file_path: "../../keys/snapshot_approle.json"
     token_ttl: "{{ snapshot_token_ttl }}"
     token_max_ttl: "{{ snapshot_token_max_ttl }}"
     secret_id_ttl: "{{ snapshot_secret_id_ttl }}"
@@ -12,40 +12,40 @@
   tasks:
     - name: "Setup AppRole for MAIN Cluster"
       include_role:
-        name: ../roles/vault_snapshot_agent
+        name: ../../roles/vault_snapshot_agent
         tasks_from: approle_setup
       vars:
         cluster_key: "main"
         vault_addr: "{{ vault_addr_main }}"
-        root_token_file: "../keys/main_cluster_keys.json"
+        root_token_file: "../../keys/main_cluster_keys.json"
 
     - name: "Setup AppRole for TRANSIT Cluster"
       include_role:
-        name: ../roles/vault_snapshot_agent
+        name: ../../roles/vault_snapshot_agent
         tasks_from: approle_setup
       vars:
         cluster_key: "transit"
         vault_addr: "{{ vault_addr_transit }}"
-        root_token_file: "../keys/transit_keys.json"
+        root_token_file: "../../keys/transit_keys.json"
 
 - name: Deploy Snapshot Agent to Main Cluster
   hosts: vault_nodes
   become: true
   vars:
-    approle_creds: "{{ lookup('file', '../keys/snapshot_approle.json') | from_json }}"
+    approle_creds: "{{ lookup('file', '../../keys/snapshot_approle.json') | from_json }}"
     snapshot_role_id: "{{ approle_creds.main.role_id }}"
     snapshot_secret_id: "{{ approle_creds.main.secret_id }}"
   roles:
-    - role: ../roles/vault_snapshot_agent
+    - role: ../../roles/vault_snapshot_agent
       when: target is not defined or target == 'vault_nodes'
 
 - name: Deploy Snapshot Agent to Transit Node
   hosts: transit_node
   become: true
   vars:
-    approle_creds: "{{ lookup('file', '../keys/snapshot_approle.json') | from_json }}"
+    approle_creds: "{{ lookup('file', '../../keys/snapshot_approle.json') | from_json }}"
     snapshot_role_id: "{{ approle_creds.transit.role_id }}"
     snapshot_secret_id: "{{ approle_creds.transit.secret_id }}"
   roles:
-    - role: ../roles/vault_snapshot_agent
+    - role: ../../roles/vault_snapshot_agent
       when: target is not defined or target == 'transit_node'
