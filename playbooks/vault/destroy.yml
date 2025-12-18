@@ -1,5 +1,5 @@
 ---
-- name: Rolling Restart Vault Nodes
+- name: Destroy Vault Nodes
   hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true  
   tasks:

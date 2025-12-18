@@ -10,7 +10,7 @@
             name: ../../roles/docker_setup
         - include_role:
             name: ../../roles/vault_transit
-      when: (target is undefined) or (target == 'transit') or (target == 'all')
+      when: (target is undefined) or (target == 'transit_node') or (target == 'all')
 
 - name: Deploy Main Cluster Nodes
   hosts: vault_nodes
@@ -24,7 +24,7 @@
             name: ../../roles/vault_node
       vars:
         transit_token_value: "{{ lookup('file', '../../keys/transit_token.txt') }}"
-      when: (target is undefined) or (target == 'main') or (target == 'all')
+      when: (target is undefined) or (target == 'vault_nodes') or (target == 'all')
 
 - name: Initialize Main Cluster & Save Keys
   hosts: vault1
@@ -59,4 +59,4 @@
         - name: Debug Info
           debug:
             msg: "Cluster is already initialized or just finished initialization."
-      when: (target is undefined) or (target == 'main') or (target == 'all')
+      when: (target is undefined) or (target == 'vault_nodes') or (target == 'all')
