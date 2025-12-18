@@ -1,0 +1,4 @@
+- name: Template Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ vault_base_dir }}-snapshot-agent/docker-compose.yml"

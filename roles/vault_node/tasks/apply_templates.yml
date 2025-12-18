@@ -1,0 +1,18 @@
+- name: Create Directories
+  file:
+    path: "{{ vault_base_dir }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - config
+    - data
+
+- name: Template Vault Config (HCL)
+  template:
+    src: vault.hcl.j2
+    dest: "{{ vault_base_dir }}/config/vault.hcl"
+
+- name: Template Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ vault_base_dir }}/docker-compose.yml"
