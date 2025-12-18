@@ -1,4 +1,28 @@
 ---
+- name: Update Templates and Configurations to Main Cluster
+  hosts: vault_nodes
+  gather_facts: false
+  become: true
+  vars:
+      transit_token_value: "{{ lookup('file', '../../keys/transit_token.txt') }}"
+  tasks:
+    - name: Updating Templates and Configurations
+      include_role:
+        name: ../../roles/vault_node
+        tasks_from: apply_templates.yml
+      when: target is not defined or target == 'vault_nodes'
+
+- name: Update Templates and Configurations to Transit Node
+  hosts: transit_node
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Updating Templates and Configurations
+      include_role:
+        name: ../../roles/vault_transit
+        tasks_from: apply_templates.yml
+      when: target is not defined or target == 'transit_node'
+            
 - name: Rolling Restart Vault Nodes
   hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true

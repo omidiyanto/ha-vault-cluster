@@ -1,4 +1,35 @@
----
+- name: Update Templates and Configurations to Main Cluster
+  hosts: vault_nodes
+  gather_facts: false
+  become: true
+  vars:
+    approle_creds: "{{ lookup('file', '../../keys/snapshot_approle.json') | from_json }}"
+    snapshot_role_id: "{{ approle_creds.main.role_id }}"
+    snapshot_secret_id: "{{ approle_creds.main.secret_id }}"
+  
+  tasks:
+    - name: Updating Templates and Configurations
+      include_role:
+        name: ../../roles/vault_snapshot_agent
+        tasks_from: apply_templates.yml
+      when: target is not defined or target == 'vault_nodes'
+
+- name: Update Templates and Configurations to Transit Node
+  hosts: transit_node
+  become: true
+  gather_facts: false
+  vars:
+    approle_creds: "{{ lookup('file', '../../keys/snapshot_approle.json') | from_json }}"
+    snapshot_role_id: "{{ approle_creds.transit.role_id }}"
+    snapshot_secret_id: "{{ approle_creds.transit.secret_id }}"
+
+  tasks:
+    - name: Updating Templates and Configurations
+      include_role:
+        name: ../../roles/vault_snapshot_agent
+        tasks_from: apply_templates.yml
+      when: target is not defined or target == 'transit_node'
+        
 - name: Restart Vault Snapshot Agent Container
   hosts: "{{ target | default('vault_nodes:transit_node') }}"
   become: true
